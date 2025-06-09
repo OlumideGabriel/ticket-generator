@@ -1,23 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Your Ticket</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
 <style>
   #ticketContainer svg {
     max-width: 100%;
-    width: 300px;
+    width: 350px;
     height: auto;
+    border-radius: 5px;
   }
+
+
 </style>
 </head>
 <body class="bg-light d-flex flex-column justify-content-center align-items-center min-vh-100">
   <div class="container text-center">
     <h1 class="mb-4">🎟️ Your Ticket</h1>
     <div id="ticketContainer" class="mb-4"></div>
-    <p class="text-muted">Your ticket has been automatically downloaded! 🎉</p>
+    <!-- Remove automatic download message -->
+    <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
+    <!-- Placeholder for the download button -->
+    <button id="downloadBtn" class="btn btn-primary d-none">Download Ticket</button>
   </div>
 
   <script>
@@ -50,7 +56,7 @@
         const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
         const url = URL.createObjectURL(svgBlob);
 
-        img.onload = function() {
+        img.onload = function () {
           const canvas = document.createElement('canvas');
           canvas.width = svg.width.baseVal.value || 300;
           canvas.height = svg.height.baseVal.value || 150;
@@ -59,17 +65,32 @@
 
           canvas.toBlob(blob => {
             const pngUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = pngUrl;
-            // Use the userName as the filename
-            const sanitizedUserName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            a.download = `${sanitizedUserName}_ticket.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
 
-            URL.revokeObjectURL(url);
-            URL.revokeObjectURL(pngUrl);
+            // Setup download button
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.href = pngUrl; // not needed but safe
+            // Create a click handler for the button
+            downloadBtn.onclick = () => {
+              const a = document.createElement('a');
+              a.href = pngUrl;
+              const sanitizedUserName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+              a.download = `${sanitizedUserName}_ticket.png`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+
+              // Optionally, show a success message after download
+              const msg = document.getElementById('downloadMessage');
+              msg.classList.remove('d-none');
+            };
+
+            // Show the button now that it’s ready
+            downloadBtn.classList.remove('d-none');
+
+            // Revoke URL after user clicks download (optional cleanup)
+            // Note: We can revoke here or after download, but for safety, revoke later.
+            // URL.revokeObjectURL(url);
+            // URL.revokeObjectURL(pngUrl);
           }, 'image/png');
         };
 
