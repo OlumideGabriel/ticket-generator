@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Your Ticket</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  #ticketContainer svg {
+    max-width: 100%;
+    width: 300px;
+    height: auto;
+  }
+</style>
+</head>
+<body class="bg-light d-flex flex-column justify-content-center align-items-center min-vh-100">
+  <div class="container text-center">
+    <h1 class="mb-4">🎟️ Your Customized Ticket</h1>
+    <div id="ticketContainer" class="mb-4"></div>
+    <p class="text-muted">Your ticket has been automatically downloaded! 🎉</p>
+  </div>
+
+  <script>
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    const userName = getQueryParam('name') || 'custom';
+
+    fetch('custom.svg')
+      .then(response => response.text())
+      .then(svgText => {
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+        const svg = svgDoc.querySelector('svg');
+
+        const textElement = svg.querySelector('#username');
+        if (textElement) {
+          textElement.textContent = userName;
+        }
+
+        const container = document.getElementById('ticketContainer');
+        container.appendChild(svg);
+
+        const serializer = new XMLSerializer();
+        const updatedSVG = serializer.serializeToString(svg);
+
+        const img = new Image();
+        const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(svgBlob);
+
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          canvas.width = svg.width.baseVal.value || 300;
+          canvas.height = svg.height.baseVal.value || 150;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          canvas.toBlob(blob => {
+            const pngUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = pngUrl;
+            // Use the userName as the filename
+            const sanitizedUserName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            a.download = `${sanitizedUserName}_ticket.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            URL.revokeObjectURL(url);
+            URL.revokeObjectURL(pngUrl);
+          }, 'image/png');
+        };
+
+        img.src = url;
+      })
+      .catch(err => {
+        console.error("Error loading SVG:", err);
+      });
+  </script>
+</body>
+</html>
