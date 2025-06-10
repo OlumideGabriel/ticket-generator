@@ -12,16 +12,13 @@
     height: auto;
     border-radius: 5px;
   }
-
 </style>
 </head>
 <body class="bg-light d-flex flex-column justify-content-center align-items-center vh-100">
   <div class="container text-center">
     <h1 class="mb-4">🎟️ Your Ticket</h1>
     <div id="ticketContainer" class="mb-4"></div>
-    <!-- Remove automatic download message -->
     <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
-    <!-- Placeholder for the download button -->
     <button id="downloadBtn" class="btn btn-primary btn-lg d-none">Download Ticket</button>
   </div>
 
@@ -31,7 +28,7 @@
       return urlParams.get(param);
     }
 
-    const userName = getQueryParam('name') || 'custom';
+    const userName = getQueryParam('name') || 'Guest';
 
     fetch('custom.svg')
       .then(response => response.text())
@@ -67,29 +64,26 @@
 
             // Setup download button
             const downloadBtn = document.getElementById('downloadBtn');
-            downloadBtn.href = pngUrl; // not needed but safe
-            // Create a click handler for the button
-            downloadBtn.onclick = () => {
+            downloadBtn.classList.remove('d-none');
+
+            downloadBtn.addEventListener('click', () => {
               const a = document.createElement('a');
               a.href = pngUrl;
               const sanitizedUserName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-              a.download = `${sanitizedUserName}_ticket.png`;
+              a.download = `${sanitizedUserName}_ticket.png`; // This will trigger the save dialog
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
 
-              // Optionally, show a success message after download
-              const msg = document.getElementById('downloadMessage');
-              msg.classList.remove('d-none');
-            };
+              // Show success message
+              document.getElementById('downloadMessage').classList.remove('d-none');
 
-            // Show the button now that it’s ready
-            downloadBtn.classList.remove('d-none');
-
-            // Revoke URL after user clicks download (optional cleanup)
-            // Note: We can revoke here or after download, but for safety, revoke later.
-            // URL.revokeObjectURL(url);
-            // URL.revokeObjectURL(pngUrl);
+              // Clean up the object URL after some time
+              setTimeout(() => {
+                URL.revokeObjectURL(pngUrl);
+                URL.revokeObjectURL(url);
+              }, 1000);
+            });
           }, 'image/png');
         };
 
@@ -97,6 +91,9 @@
       })
       .catch(err => {
         console.error("Error loading SVG:", err);
+        // Show error message to user
+        const container = document.getElementById('ticketContainer');
+        container.innerHTML = '<div class="alert alert-danger">Failed to load ticket. Please try again.</div>';
       });
   </script>
 </body>
