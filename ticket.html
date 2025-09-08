@@ -11,7 +11,6 @@
     width: 350px;
     height: auto;
     border-radius: 5px;
-    border: 4px solid #ffc9d8;
   }
 
   /* Confetti animation styles */
@@ -32,11 +31,12 @@
 </style>
 </head>
 <body class="bg-light d-flex flex-column justify-content-center align-items-center vh-100">
-  <div class="container text-center ">
+  <div class="container text-center">
     <h1 class="mb-4">🎟️ Your Ticket</h1>
     <div id="ticketContainer" class="mb-4"></div>
     <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
     <button id="downloadBtn" class="btn btn-primary btn-lg d-none">Download Ticket</button>
+    <button id="addToCalendarBtn" class="btn btn-success btn-lg d-none mt-3">Add to Calendar</button>
   </div>
 
   <script>
@@ -121,18 +121,26 @@
               const a = document.createElement('a');
               a.href = pngUrl;
               const sanitizedUserName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-              a.download = `${sanitizedUserName}_ticket.png`; // This will trigger the save dialog
+              a.download = `${sanitizedUserName}_ticket.png`;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
 
-              // Show success message
+              // Hide download button and show success message
+              downloadBtn.classList.add('d-none');
               document.getElementById('downloadMessage').classList.remove('d-none');
+
+              // Show Add to Calendar button after download
+              setTimeout(() => {
+                const addToCalendarBtn = document.getElementById('addToCalendarBtn');
+                addToCalendarBtn.classList.remove('d-none');
+                addToCalendarBtn.addEventListener('click', addToCalendar);
+              }, 300);
 
               // Trigger confetti animation
               createConfetti();
 
-              // Clean up the object URL after some time
+              // Clean up
               setTimeout(() => {
                 URL.revokeObjectURL(pngUrl);
                 URL.revokeObjectURL(url);
@@ -145,10 +153,35 @@
       })
       .catch(err => {
         console.error("Error loading SVG:", err);
-        // Show error message to user
         const container = document.getElementById('ticketContainer');
         container.innerHTML = '<div class="alert alert-danger">Failed to load ticket. Please try again.</div>';
       });
+
+    // ✅ Google Calendar integration
+    function addToCalendar() {
+      const eventTitle = "Igando Beauty Event";
+      const eventDescription = "Your event ticket 🎟️";
+      const eventLocation = "Moreta Hall, Isheri Rd, Ijegun, Ikeja 102213, Lagos, Nigeria";
+      const startDate = new Date("2025-09-13T10:00:00");
+      const endDate = new Date("2025-09-13T14:00:00");
+
+      function formatDate(date) {
+        return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      }
+
+      const startStr = formatDate(startDate);
+      const endStr = formatDate(endDate);
+
+      const googleCalendarUrl =
+        `https://calendar.google.com/calendar/render?action=TEMPLATE` +
+        `&text=${encodeURIComponent(eventTitle)}` +
+        `&dates=${startStr}/${endStr}` +
+        `&details=${encodeURIComponent(eventDescription)}` +
+        `&location=${encodeURIComponent(eventLocation)}` +
+        `&sf=true&output=xml`;
+
+      window.open(googleCalendarUrl, "_blank");
+    }
   </script>
 </body>
 </html>
