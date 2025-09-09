@@ -190,15 +190,46 @@
                 this.elements.downloadBtn.onclick = () => this.downloadTicket(pngUrl);
             }
 
-            downloadTicket(pngUrl) {
-                const link = document.createElement('a');
-                link.href = pngUrl;
-                link.download = this.generateFileName();
-                link.click();
+            async downloadTicket(pngUrl) {
+                try {
+                    // Fetch the PNG blob
+                    const response = await fetch(pngUrl);
+                    const blob = await response.blob();
 
-                this.showDownloadSuccess();
-                this.showCalendarButton();
+                    // Chrome/Edge with File System Access API
+                    if (window.showSaveFilePicker) {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: this.generateFileName(),
+                            types: [{
+                                description: 'PNG Image',
+                                accept: { 'image/png': ['.png'] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        alert("Ticket saved successfully!");
+                    } else {
+                        // Fallback: normal download
+                        const link = document.createElement('a');
+                        link.href = pngUrl;
+                        link.download = this.generateFileName();
+                        link.click();
+
+                        // 📱 On mobile → also open in new tab for "Save to Photos"
+                        if (/Mobi|Android/i.test(navigator.userAgent)) {
+                            window.open(pngUrl, "_blank");
+                        }
+                    }
+
+                    this.showDownloadSuccess();
+                    this.showCalendarButton();
+                } catch (err) {
+                    console.error("Download failed:", err);
+                    alert("Could not save ticket. Please try again.");
+                }
             }
+
 
             generateFileName() {
                 const safeName = this.userName
