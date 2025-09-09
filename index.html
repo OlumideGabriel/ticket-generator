@@ -32,7 +32,7 @@
       try {
         // Disable button to prevent multiple submissions
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
+        submitBtn.textContent = 'Generating...';
         
         // Send name to Google Sheets
         const response = await fetch(webAppURL, {
