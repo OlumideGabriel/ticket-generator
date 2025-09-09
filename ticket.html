@@ -81,6 +81,16 @@
 
     const userName = getQueryParam('name') || 'Guest';
 
+    // ✅ Send name to Google Sheets
+    fetch("https://script.google.com/macros/s/AKfycbx0izIu8kacD9D-GgLsHNL_CPQ1RZytzwgLpgCvcGF-HE1jqlIRZGgpxaaHyV4HeH1Y/exec", {
+      method: "POST",
+      mode: "no-cors", // allows cross-origin without errors
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: userName })
+    });
+
     fetch('Igando_Event_Ticket.svg')
       .then(response => response.text())
       .then(svgText => {
