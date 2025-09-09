@@ -20,24 +20,42 @@
 
   <script>
     const form = document.getElementById('ticketForm');
-    form.addEventListener('submit', function(e) {
-      e.preventDefault(); // Stop normal form submission
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
 
       const name = document.getElementById('name').value.trim();
       if (!name) return alert("Please enter your name.");
 
-      const webAppURL = "https://script.google.com/macros/s/AKfycbxXOhLSIH2dYzIcEL-MxO8ckFpMtb5UhPxrmjbhOxrkaH3oWoUZ_wPluOZfKsubnHHm/exec";
-
-      // Send name to Google Sheets
-      fetch(webAppURL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name })
-      }).finally(() => {
-        // Redirect to ticket page
+      const webAppURL = "https://script.google.com/macros/s/AKfycbx8wEL1_N5PP_Zu9AEWDtThUxdIAHF2V4EW8_C8PpoT9HsqoNFT_AJDtBr6yMVlX7it/exec";
+      const submitBtn = form.querySelector('button[type="submit"]');
+      
+      try {
+        // Disable button to prevent multiple submissions
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        
+        // Send name to Google Sheets
+        const response = await fetch(webAppURL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { 
+            "Content-Type": "application/json" 
+          },
+          body: JSON.stringify({ name })
+        });
+        
+        console.log('Response status:', response.status);
+        
+        // Even with no-cors, we can't read the response, but we can log that we sent the request
+        console.log('Request sent to Google Sheets');
+        
+      } catch (error) {
+        console.error('Error:', error);
+        // Continue to redirect even if there's an error
+      } finally {
+        // Always redirect to ticket page
         window.location.href = `ticket.html?name=${encodeURIComponent(name)}`;
-      });
+      }
     });
   </script>
 </body>
