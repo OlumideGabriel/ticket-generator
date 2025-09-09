@@ -5,8 +5,6 @@
     <title>Your Ticket</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Include jsPDF library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         #ticketContainer svg {
             max-width: 100%;
@@ -43,47 +41,11 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
-
-        .download-options {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 20px;
-        }
-
-        .btn-group-vertical .btn {
-            margin-bottom: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .download-options {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .download-options .btn {
-                width: 200px;
-            }
-        }
-
-        .format-info {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            border-left: 4px solid #0d6efd;
-        }
-
-        .format-info h6 {
-            color: #0d6efd;
-            margin-bottom: 8px;
-        }
     </style>
 </head>
-<body class="bg-light d-flex flex-column justify-content-center align-items-center vh-100">
+<body class="bg-light d-flex flex-column justify-content-center align-items-center vh-100 max-dvh-100">
     <div class="container text-center">
-        <h1 class="mb-4">🎟️ Your Event Ticket</h1>
+        <h1 class="mb-4">🎟️ Your Ticket</h1>
 
         <div id="loadingState" class="mb-4">
             <div class="loading-placeholder mx-auto"></div>
@@ -93,35 +55,13 @@
         <div id="ticketContainer" class="mb-4 d-none"></div>
         <div id="errorState" class="alert alert-danger d-none"></div>
 
-        <div id="downloadSection" class="d-none">
-
-            <div class="download-options">
-                <button id="downloadPdfBtn" class="btn btn-primary btn-lg">
-                  Download as PDF
-                </button>
-                <button id="downloadPngBtn" class="btn btn-outline-primary btn-lg">
-                   Download as PNG
-                </button>
-            </div>
-
-            <div class="mt-3">
-                <small class="text-muted">
-                    Files will be saved to your preferred location
-                </small>
-            </div>
-        </div>
-
-        <p id="downloadMessage" class="text-success mt-3 d-none">
-            ✅ Your ticket has been downloaded successfully! 🎉
-        </p>
-
-        <button id="addToCalendarBtn" class="btn btn-success btn-lg d-none mt-3">
-           Add to Calendar
-        </button>
+        <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
+        <button id="downloadBtn" class="btn btn-primary btn-lg d-none">Download Ticket</button>
+        <button id="addToCalendarBtn" class="btn btn-success btn-lg d-none mt-3">Add to Calendar</button>
     </div>
 
     <script>
-        class EnhancedTicketDisplay {
+        class TicketDisplay {
             constructor() {
                 this.eventConfig = {
                     name: "Igando Beauty Event",
@@ -135,15 +75,12 @@
                     loadingState: document.getElementById('loadingState'),
                     ticketContainer: document.getElementById('ticketContainer'),
                     errorState: document.getElementById('errorState'),
-                    downloadSection: document.getElementById('downloadSection'),
-                    downloadPdfBtn: document.getElementById('downloadPdfBtn'),
-                    downloadPngBtn: document.getElementById('downloadPngBtn'),
+                    downloadBtn: document.getElementById('downloadBtn'),
                     addToCalendarBtn: document.getElementById('addToCalendarBtn'),
                     downloadMessage: document.getElementById('downloadMessage')
                 };
 
                 this.userName = this.getQueryParam('name') || 'Guest';
-                this.ticketCanvas = null;
                 this.initialize();
             }
 
@@ -157,371 +94,197 @@
                     await this.loadAndCustomizeTicket();
                     this.showTicket();
                 } catch (error) {
-                    // Fallback to embedded SVG if external file fails
-                    console.log('External SVG failed, using embedded version');
-                    await this.createEmbeddedTicket();
-                    this.showTicket();
+                    this.showError('Failed to load ticket. Please try again.');
                 }
             }
 
             async loadAndCustomizeTicket() {
-                try {
-                    const response = await fetch(this.eventConfig.svgFile);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load SVG: ${response.status}`);
-                    }
+                const possiblePaths = [
+                    this.eventConfig.svgFile,
+                    `./${this.eventConfig.svgFile}`,
+                    `/${this.eventConfig.svgFile}`,
+                    `./assets/${this.eventConfig.svgFile}`,
+                    `/assets/${this.eventConfig.svgFile}`
+                ];
 
-                    const svgText = await response.text();
-                    const svg = this.customizeSVG(svgText);
-                    this.elements.ticketContainer.appendChild(svg);
-                    await this.prepareForDownload(svg);
-                } catch (error) {
-                    throw error;
+                let response = null;
+                for (const path of possiblePaths) {
+                    try {
+                        response = await fetch(path);
+                        if (response.ok) break;
+                    } catch {}
                 }
-            }
 
-            async createEmbeddedTicket() {
-                const svg = this.createSVGTicket();
+                if (!response || !response.ok) {
+                    throw new Error("SVG file not found");
+                }
+
+                const svgText = await response.text();
+                const svg = this.customizeSVG(svgText);
                 this.elements.ticketContainer.appendChild(svg);
-                await this.prepareForDownload(svg);
-            }
-
-            createSVGTicket() {
-                const svgTemplate = `
-                    <svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="ticketGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-                                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-                            </linearGradient>
-                            <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                                <circle cx="10" cy="10" r="1.5" fill="rgba(255,255,255,0.15)"/>
-                            </pattern>
-                        </defs>
-
-                        <!-- Main ticket background -->
-                        <rect width="400" height="250" rx="20" ry="20" fill="url(#ticketGradient)"/>
-                        <rect width="400" height="250" rx="20" ry="20" fill="url(#dots)"/>
-
-                        <!-- Perforated edge -->
-                        <line x1="280" y1="30" x2="280" y2="220" stroke="rgba(255,255,255,0.4)" stroke-width="3" stroke-dasharray="8,8"/>
-
-                        <!-- Left circle cutouts -->
-                        <circle cx="280" cy="70" r="12" fill="#f8f9fa"/>
-                        <circle cx="280" cy="180" r="12" fill="#f8f9fa"/>
-
-                        <!-- Header -->
-                        <rect x="20" y="20" width="240" height="40" rx="8" fill="rgba(255,255,255,0.1)"/>
-                        <text x="140" y="45" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">
-                            ${this.eventConfig.name}
-                        </text>
-
-                        <!-- Date section -->
-                        <rect x="20" y="80" width="240" height="25" rx="5" fill="rgba(255,255,255,0.05)"/>
-                        <text x="30" y="98" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.9)">
-                            📅 ${this.formatDate(this.eventConfig.date)}
-                        </text>
-
-                        <!-- Time section -->
-                        <text x="30" y="125" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.9)">
-                            🕙 ${this.formatTime(this.eventConfig.date)} - ${this.formatTime(this.eventConfig.endDate)}
-                        </text>
-
-                        <!-- Location section -->
-                        <rect x="20" y="140" width="240" height="35" rx="5" fill="rgba(255,255,255,0.05)"/>
-                        <text x="30" y="158" font-family="Arial, sans-serif" font-size="12" fill="rgba(255,255,255,0.85)">
-                            📍 ${this.eventConfig.location.substring(0, 28)}
-                        </text>
-                        <text x="30" y="172" font-family="Arial, sans-serif" font-size="12" fill="rgba(255,255,255,0.85)">
-                            ${this.eventConfig.location.substring(28)}
-                        </text>
-
-                        <!-- Username section -->
-                        <rect x="20" y="185" width="240" height="25" rx="5" fill="rgba(255,255,255,0.1)"/>
-                        <text x="30" y="203" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">
-                            👤 <tspan id="username">${this.userName}</tspan>
-                        </text>
-
-                        <!-- Ticket number -->
-                        <text x="30" y="230" font-family="Arial, sans-serif" font-size="11" fill="rgba(255,255,255,0.7)">
-                            Ticket #${this.generateTicketNumber()}
-                        </text>
-
-                        <!-- QR Code placeholder -->
-                        <rect x="300" y="40" width="80" height="80" rx="8" fill="white"/>
-                        <rect x="310" y="50" width="60" height="60" rx="4" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1"/>
-                        <text x="340" y="85" font-family="Arial, sans-serif" font-size="10" fill="#666" text-anchor="middle">QR CODE</text>
-
-                        <!-- Stub section -->
-                        <text x="340" y="150" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" transform="rotate(-90 340 150)">
-                            ADMIT ONE
-                        </text>
-                        <text x="340" y="190" font-family="Arial, sans-serif" font-size="8" fill="rgba(255,255,255,0.8)" text-anchor="middle" transform="rotate(-90 340 190)">
-                            #${this.generateTicketNumber()}
-                        </text>
-
-                        <!-- Decorative elements -->
-                        <circle cx="50" cy="40" r="3" fill="rgba(255,255,255,0.3)"/>
-                        <circle cx="210" cy="40" r="3" fill="rgba(255,255,255,0.3)"/>
-                    </svg>
-                `;
-
-                const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(svgTemplate, "image/svg+xml");
-                return svgDoc.querySelector('svg');
+                await this.setupDownload(svg);
             }
 
             customizeSVG(svgText) {
                 const parser = new DOMParser();
                 const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
                 const svg = svgDoc.querySelector('svg');
+                if (!svg) throw new Error('No SVG element found');
 
                 const textElement = svg.querySelector('#username');
-                if (textElement) {
-                    textElement.textContent = this.userName;
-                }
+                if (textElement) textElement.textContent = this.userName;
 
                 return svg;
             }
 
-            formatDate(dateString) {
-                const date = new Date(dateString);
-                return date.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-            }
-
-            formatTime(dateString) {
-                const date = new Date(dateString);
-                return date.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
-            }
-
-            generateTicketNumber() {
-                return Math.random().toString(36).substring(2, 10).toUpperCase();
-            }
-
-            async prepareForDownload(svg) {
+            async setupDownload(svg) {
                 return new Promise((resolve, reject) => {
-                    const serializer = new XMLSerializer();
-                    const svgString = serializer.serializeToString(svg);
+                    try {
+                        const serializer = new XMLSerializer();
+                        const updatedSVG = serializer.serializeToString(svg);
+                        const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
+                        const url = URL.createObjectURL(svgBlob);
 
-                    // Create canvas for both PNG and PDF
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                const canvas = this.createCanvas(svg, img);
+                                canvas.toBlob(blob => {
+                                    if (!blob) {
+                                        reject(new Error('Failed to create PNG blob'));
+                                        return;
+                                    }
+                                    const pngUrl = URL.createObjectURL(blob);
+                                    this.setupDownloadButton(pngUrl);
+                                    URL.revokeObjectURL(url);
+                                    resolve();
+                                }, 'image/png');
+                            } catch (canvasError) {
+                                reject(canvasError);
+                            }
+                        };
 
-                    // Set high resolution for better quality
-                    const scale = 2;
-                    canvas.width = 400 * scale;
-                    canvas.height = 250 * scale;
-                    ctx.scale(scale, scale);
-
-                    const img = new Image();
-
-                    img.onload = () => {
-                        // White background for better printing
-                        ctx.fillStyle = 'white';
-                        ctx.fillRect(0, 0, 400, 250);
-
-                        ctx.drawImage(img, 0, 0, 400, 250);
-                        this.ticketCanvas = canvas;
-                        this.setupDownloadButtons();
-                        resolve();
-                    };
-
-                    img.onerror = () => reject(new Error('Failed to load SVG as image'));
-
-                    const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-                    const svgUrl = URL.createObjectURL(svgBlob);
-                    img.src = svgUrl;
+                        img.onerror = () => reject(new Error('Failed to load SVG as image'));
+                        img.src = url;
+                    } catch (setupError) {
+                        reject(setupError);
+                    }
                 });
             }
 
-            setupDownloadButtons() {
-                this.elements.downloadSection.classList.remove('d-none');
+            createCanvas(svg, img) {
+                const canvas = document.createElement('canvas');
+                const width = svg.width?.baseVal?.value || img.width || 350;
+                const height = svg.height?.baseVal?.value || img.height || 200;
+                canvas.width = width;
+                canvas.height = height;
 
-                this.elements.downloadPdfBtn.onclick = () => this.downloadAsPDF();
-                this.elements.downloadPngBtn.onclick = () => this.downloadAsPNG();
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                return canvas;
             }
 
-            downloadAsPDF() {
-                try {
-                    const { jsPDF } = window.jspdf;
-
-                    // Create PDF in landscape mode to fit ticket better
-                    const pdf = new jsPDF({
-                        orientation: 'landscape',
-                        unit: 'mm',
-                        format: 'a4'
-                    });
-
-                    // Get canvas image data
-                    const imgData = this.ticketCanvas.toDataURL('image/png', 1.0);
-
-                    // Calculate dimensions to center the ticket on the page
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = pdf.internal.pageSize.getHeight();
-
-                    // Ticket dimensions in mm (maintaining aspect ratio)
-                    const ticketWidth = 120; // mm
-                    const ticketHeight = 75;  // mm
-
-                    // Center the ticket
-                    const xOffset = (pdfWidth - ticketWidth) / 2;
-                    const yOffset = (pdfHeight - ticketHeight) / 2;
-
-                    // Add the ticket image
-                    pdf.addImage(imgData, 'PNG', xOffset, yOffset, ticketWidth, ticketHeight);
-
-                    // Add some metadata
-                    pdf.setProperties({
-                        title: `${this.eventConfig.name} - Ticket`,
-                        subject: 'Event Ticket',
-                        author: 'Event Ticketing System',
-                        creator: 'Igando Beauty Event'
-                    });
-
-                    // Use File System Access API if available, otherwise fall back to regular download
-                    this.saveFileWithPicker(
-                        () => pdf.output('blob'),
-                        this.generateFileName('pdf'),
-                        'application/pdf'
-                    );
-
-                } catch (error) {
-                    console.error('PDF generation error:', error);
-                    alert('Failed to generate PDF. Please try PNG download instead.');
-                }
+            setupDownloadButton(pngUrl) {
+                this.elements.downloadBtn.classList.remove('d-none');
+                this.elements.downloadBtn.onclick = () => this.downloadTicket(pngUrl);
             }
 
-            downloadAsPNG() {
-                this.ticketCanvas.toBlob(blob => {
-                    this.saveFileWithPicker(
-                        () => blob,
-                        this.generateFileName('png'),
-                        'image/png'
-                    );
-                }, 'image/png', 1.0);
-            }
-
-            async saveFileWithPicker(getBlobFn, fileName, mimeType) {
-                try {
-                    // Check if File System Access API is supported
-                    if ('showSaveFilePicker' in window) {
-                        const fileHandle = await window.showSaveFilePicker({
-                            suggestedName: fileName,
-                            types: [{
-                                description: mimeType === 'application/pdf' ? 'PDF files' : 'PNG images',
-                                accept: {
-                                    [mimeType]: [mimeType === 'application/pdf' ? '.pdf' : '.png']
-                                }
-                            }]
-                        });
-
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(getBlobFn());
-                        await writable.close();
-
-                        this.showDownloadSuccess(`File saved successfully!`);
-                    } else {
-                        // Fallback to regular download for browsers that don't support File System Access API
-                        this.fallbackDownload(getBlobFn(), fileName);
-                    }
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        // If file picker fails, fall back to regular download
-                        this.fallbackDownload(getBlobFn(), fileName);
-                    }
-                }
-            }
-
-            fallbackDownload(blob, fileName) {
-                const url = URL.createObjectURL(blob);
+            downloadTicket(pngUrl) {
                 const link = document.createElement('a');
-                link.href = url;
-                link.download = fileName;
-                document.body.appendChild(link);
+                link.href = pngUrl;
+                link.download = this.generateFileName();
                 link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
 
-                this.showDownloadSuccess(`${fileName} downloaded to your Downloads folder`);
+                this.showDownloadSuccess();
+                this.showCalendarButton();
             }
 
-            generateFileName(extension) {
+            generateFileName() {
                 const safeName = this.userName
                     .replace(/[^a-z0-9]/gi, '_')
                     .toLowerCase();
-                const eventName = this.eventConfig.name
-                    .replace(/[^a-z0-9]/gi, '_')
-                    .toLowerCase();
-
-                const timestamp = new Date().toISOString().slice(0, 10);
-                return `${eventName}_ticket_${safeName}_${timestamp}.${extension}`;
+                return `${safeName}_ticket.png`;
             }
 
-            showDownloadSuccess(message) {
-                this.elements.downloadMessage.textContent = message;
+            showDownloadSuccess() {
+                this.elements.downloadBtn.classList.add('d-none');
                 this.elements.downloadMessage.classList.remove('d-none');
+                this.createConfetti();
+            }
 
-                // Show calendar button
+            showCalendarButton() {
                 this.elements.addToCalendarBtn.classList.remove('d-none');
                 this.elements.addToCalendarBtn.onclick = () => this.addToCalendar();
-
-                this.createConfetti();
-
-                // Hide success message after 5 seconds
-                setTimeout(() => {
-                    this.elements.downloadMessage.classList.add('d-none');
-                }, 5000);
             }
 
             createConfetti() {
-                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+                const colors = [
+                    '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4',
+                    '#feca57', '#ff9ff3', '#54a0ff'
+                ];
+
                 const fragment = document.createDocumentFragment();
-
                 for (let i = 0; i < 50; i++) {
-                    const confetti = document.createElement('div');
-                    confetti.classList.add('confetti');
-                    confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
-                    confetti.style.left = Math.random() * 100 + 'vw';
-                    confetti.style.width = confetti.style.height = (Math.random() * 8 + 4) + 'px';
-                    confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
-                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
-
+                    const confetti = this.createConfettiPiece(colors);
                     fragment.appendChild(confetti);
                     setTimeout(() => confetti.remove(), 4000);
                 }
-
                 document.body.appendChild(fragment);
+            }
+
+            createConfettiPiece(colors) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = Math.random() * 100 + 'vw';
+
+                const size = Math.random() * 8 + 4;
+                confetti.style.width = confetti.style.height = size + 'px';
+                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+
+                return confetti;
             }
 
             addToCalendar() {
                 const { name, date, endDate, location } = this.eventConfig;
                 const startDate = new Date(date);
                 const endEventDate = new Date(endDate);
+                const formatDate = d => d.toISOString()
+                    .replace(/[-:]/g, "")
+                    .split(".")[0] + "Z";
 
-                const formatDate = d => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-                const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(name)}&dates=${formatDate(startDate)}/${formatDate(endEventDate)}&details=${encodeURIComponent("Your event ticket 🎟️")}&location=${encodeURIComponent(location)}`;
+                const baseUrl = "https://calendar.google.com/calendar/render";
+                const params = new URLSearchParams({
+                    action: "TEMPLATE",
+                    text: name,
+                    dates: `${formatDate(startDate)}/${formatDate(endEventDate)}`,
+                    details: "Your event ticket 🎟️",
+                    location: location
+                });
 
-                window.open(calendarUrl, "_blank");
+                window.open(`${baseUrl}?${params.toString()}`, "_blank");
             }
 
             showTicket() {
                 this.elements.loadingState.style.display = 'none';
                 this.elements.ticketContainer.classList.remove('d-none');
             }
+
+            showError(message) {
+                this.elements.loadingState.classList.add('d-none');
+                this.elements.errorState.textContent = message;
+                this.elements.errorState.classList.remove('d-none');
+
+                if ('vibrate' in navigator) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+            }
         }
 
-        // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
-            new EnhancedTicketDisplay();
+            new TicketDisplay();
         });
     </script>
 </body>
