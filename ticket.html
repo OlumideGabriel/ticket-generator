@@ -1,115 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Your Ticket</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-  #ticketContainer svg {
-    max-width: 100%;
-    width: 350px;
-    height: auto;
-    border-radius: 5px;
-  }
-  .confetti {
-    position: fixed;
-    width: 10px;
-    height: 10px;
-    z-index: 1000;
-    animation: confetti-fall 3s linear forwards;
-  }
-  @keyframes confetti-fall {
-    to { transform: translateY(100vh) rotate(360deg); }
-  }
-</style>
+    <meta charset="UTF-8">
+    <title>Your Ticket</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #ticketContainer svg {
+            max-width: 100%;
+            width: 350px;
+            height: auto;
+            border-radius: 5px;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 1000;
+            animation: confetti-fall 3s linear forwards;
+        }
+
+        @keyframes confetti-fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+            }
+        }
+
+        .loading-placeholder {
+            width: 350px;
+            height: 200px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 5px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
 </head>
 <body class="bg-light d-flex flex-column justify-content-center align-items-center vh-100">
-  <div class="container text-center">
-    <h1 class="mb-4">🎟️ Your Ticket</h1>
-    <div id="ticketContainer" class="mb-4"></div>
-    <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
-    <button id="downloadBtn" class="btn btn-primary btn-lg d-none">Download Ticket</button>
-    <button id="addToCalendarBtn" class="btn btn-success btn-lg d-none mt-3">Add to Calendar</button>
-  </div>
+    <div class="container text-center">
+        <h1 class="mb-4">🎟️ Your Ticket</h1>
 
-  <script>
-    function getQueryParam(param) {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get(param);
-    }
+        <div id="loadingState" class="mb-4">
+            <div class="loading-placeholder mx-auto"></div>
+            <p class="text-muted mt-2">Generating your personalized ticket...</p>
+        </div>
 
-    const userName = getQueryParam('name') || 'Guest';
+        <div id="ticketContainer" class="mb-4 d-none"></div>
+        <div id="errorState" class="alert alert-danger d-none"></div>
 
-    function createConfetti() {
-      const colors = ['#ff6b6b','#4ecdc4','#45b7d1','#96ceb4','#feca57','#ff9ff3','#54a0ff'];
-      for (let i = 0; i < 50; i++) {
-        const confetti = document.createElement('div');
-        confetti.classList.add('confetti');
-        confetti.style.background = colors[Math.floor(Math.random()*colors.length)];
-        confetti.style.left = Math.random()*100+'vw';
-        const size = Math.random()*8 + 4;
-        confetti.style.width = confetti.style.height = size+'px';
-        confetti.style.animationDuration = (Math.random()*2 + 2)+'s';
-        confetti.style.animationDelay = Math.random()*0.5+'s';
-        document.body.appendChild(confetti);
-        setTimeout(() => confetti.remove(), 4000);
-      }
-    }
+        <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
+        <button id="downloadBtn" class="btn btn-primary btn-lg d-none">Download Ticket</button>
+        <button id="addToCalendarBtn" class="btn btn-success btn-lg d-none mt-3">Add to Calendar</button>
+    </div>
 
-    fetch('Igando_Event_Ticket.svg')
-      .then(res => res.text())
-      .then(svgText => {
-        const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(svgText,"image/svg+xml");
-        const svg = svgDoc.querySelector('svg');
-        const textEl = svg.querySelector('#username');
-        if(textEl) textEl.textContent = userName;
-        document.getElementById('ticketContainer').appendChild(svg);
+    <script>
+        class TicketDisplay {
+            constructor() {
+                this.eventConfig = {
+                    name: "Igando Beauty Event",
+                    date: "2025-09-13T10:00:00",
+                    endDate: "2025-09-13T14:00:00",
+                    location: "Moreta Hall, Isheri Rd, Ijegun, Ikeja, Lagos",
+                    svgFile: "Igando_Event_Ticket.svg"
+                };
 
-        const serializer = new XMLSerializer();
-        const updatedSVG = serializer.serializeToString(svg);
-        const img = new Image();
-        const svgBlob = new Blob([updatedSVG], {type:"image/svg+xml"});
-        const url = URL.createObjectURL(svgBlob);
+                this.elements = {
+                    loadingState: document.getElementById('loadingState'),
+                    ticketContainer: document.getElementById('ticketContainer'),
+                    errorState: document.getElementById('errorState'),
+                    downloadBtn: document.getElementById('downloadBtn'),
+                    addToCalendarBtn: document.getElementById('addToCalendarBtn'),
+                    downloadMessage: document.getElementById('downloadMessage')
+                };
 
-        img.onload = function() {
-          const canvas = document.createElement('canvas');
-          canvas.width = svg.width.baseVal.value || 300;
-          canvas.height = svg.height.baseVal.value || 150;
-          canvas.getContext('2d').drawImage(img, 0,0);
-          canvas.toBlob(blob => {
-            const pngUrl = URL.createObjectURL(blob);
-            const downloadBtn = document.getElementById('downloadBtn');
-            downloadBtn.classList.remove('d-none');
-            downloadBtn.onclick = () => {
-              const a = document.createElement('a');
-              a.href = pngUrl;
-              a.download = `${userName.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_ticket.png`;
-              a.click();
-              downloadBtn.classList.add('d-none');
-              document.getElementById('downloadMessage').classList.remove('d-none');
-              createConfetti();
-              setTimeout(()=>{URL.revokeObjectURL(pngUrl); URL.revokeObjectURL(url);},1000);
-              const addToCalendarBtn = document.getElementById('addToCalendarBtn');
-              addToCalendarBtn.classList.remove('d-none');
-              addToCalendarBtn.addEventListener('click', addToCalendar);
-            };
-          }, 'image/png');
-        };
-        img.src = url;
-      }).catch(err=>{
-        console.error(err);
-        document.getElementById('ticketContainer').innerHTML='<div class="alert alert-danger">Failed to load ticket.</div>';
-      });
+                this.userName = this.getQueryParam('name') || 'Guest';
+                this.initialize();
+            }
 
-    function addToCalendar() {
-      const start = new Date("2025-09-13T10:00:00");
-      const end = new Date("2025-09-13T14:00:00");
-      const formatDate = d => d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
-      const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Igando Beauty Event")}&dates=${formatDate(start)}/${formatDate(end)}&details=${encodeURIComponent("Your event ticket 🎟️")}&location=${encodeURIComponent("Moreta Hall, Isheri Rd, Ijegun, Ikeja, Lagos")}`;
-      window.open(url, "_blank");
-    }
-  </script>
+            getQueryParam(param) {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get(param);
+            }
+
+            async initialize() {
+                try {
+                    await this.loadAndCustomizeTicket();
+                    this.showTicket();
+                } catch (error) {
+                    this.showError('Failed to load ticket. Please try again.');
+                    console.error('Ticket loading error:', error);
+                }
+            }
+
+            async loadAndCustomizeTicket() {
+                const response = await fetch(this.eventConfig.svgFile);
+                if (!response.ok) {
+                    throw new Error(`Failed to load SVG: ${response.status}`);
+                }
+
+                const svgText = await response.text();
+                const svg = this.customizeSVG(svgText);
+                this.elements.ticketContainer.appendChild(svg);
+
+                await this.setupDownload(svg);
+            }
+
+            customizeSVG(svgText) {
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+                const svg = svgDoc.querySelector('svg');
+
+                const textElement = svg.querySelector('#username');
+                if (textElement) {
+                    textElement.textContent = this.userName;
+                }
+
+                return svg;
+            }
+
+            async setupDownload(svg) {
+                return new Promise((resolve, reject) => {
+                    const serializer = new XMLSerializer();
+                    const updatedSVG = serializer.serializeToString(svg);
+                    const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
+                    const url = URL.createObjectURL(svgBlob);
+
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = this.createCanvas(svg, img);
+                            canvas.toBlob(blob => {
+                                const pngUrl = URL.createObjectURL(blob);
+                                this.setupDownloadButton(pngUrl);
+                                this.cleanupUrls(url, pngUrl);
+                                resolve();
+                            }, 'image/png');
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+
+                    img.onerror = () => reject(new Error('Failed to load image'));
+                    img.src = url;
+                });
+            }
+
+            createCanvas(svg, img) {
+                const canvas = document.createElement('canvas');
+                canvas.width = svg.width?.baseVal?.value || 300;
+                canvas.height = svg.height?.baseVal?.value || 150;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                return canvas;
+            }
+
+            setupDownloadButton(pngUrl) {
+                this.elements.downloadBtn.classList.remove('d-none');
+                this.elements.downloadBtn.onclick = () => this.downloadTicket(pngUrl);
+            }
+
+            downloadTicket(pngUrl) {
+                const link = document.createElement('a');
+                link.href = pngUrl;
+                link.download = this.generateFileName();
+                link.click();
+
+                this.showDownloadSuccess();
+                this.showCalendarButton();
+            }
+
+            generateFileName() {
+                const safeName = this.userName
+                    .replace(/[^a-z0-9]/gi, '_')
+                    .toLowerCase();
+                return `${safeName}_ticket.png`;
+            }
+
+            showDownloadSuccess() {
+                this.elements.downloadBtn.classList.add('d-none');
+                this.elements.downloadMessage.classList.remove('d-none');
+                this.createConfetti();
+            }
+
+            showCalendarButton() {
+                this.elements.addToCalendarBtn.classList.remove('d-none');
+                this.elements.addToCalendarBtn.onclick = () => this.addToCalendar();
+            }
+
+            createConfetti() {
+                const colors = [
+                    '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4',
+                    '#feca57', '#ff9ff3', '#54a0ff'
+                ];
+
+                const fragment = document.createDocumentFragment();
+
+                for (let i = 0; i < 50; i++) {
+                    const confetti = this.createConfettiPiece(colors);
+                    fragment.appendChild(confetti);
+
+                    setTimeout(() => confetti.remove(), 4000);
+                }
+
+                document.body.appendChild(fragment);
+            }
+
+            createConfettiPiece(colors) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = Math.random() * 100 + 'vw';
+
+                const size = Math.random() * 8 + 4;
+                confetti.style.width = confetti.style.height = size + 'px';
+                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+
+                return confetti;
+            }
+
+            addToCalendar() {
+                const { name, date, endDate, location } = this.eventConfig;
+
+                const startDate = new Date(date);
+                const endEventDate = new Date(endDate);
+
+                const formatDate = d => d.toISOString()
+                    .replace(/[-:]/g, "")
+                    .split(".")[0] + "Z";
+
+                const calendarUrl = this.buildCalendarUrl({
+                    title: name,
+                    start: formatDate(startDate),
+                    end: formatDate(endEventDate),
+                    description: "Your event ticket 🎟️",
+                    location: location
+                });
+
+                window.open(calendarUrl, "_blank");
+            }
+
+            buildCalendarUrl({ title, start, end, description, location }) {
+                const baseUrl = "https://calendar.google.com/calendar/render";
+                const params = new URLSearchParams({
+                    action: "TEMPLATE",
+                    text: title,
+                    dates: `${start}/${end}`,
+                    details: description,
+                    location: location
+                });
+
+                return `${baseUrl}?${params.toString()}`;
+            }
+
+            showTicket() {
+                this.elements.loadingState.classList.add('d-none');
+                this.elements.ticketContainer.classList.remove('d-none');
+            }
+
+            showError(message) {
+                this.elements.loadingState.classList.add('d-none');
+                this.elements.errorState.textContent = message;
+                this.elements.errorState.classList.remove('d-none');
+            }
+
+            cleanupUrls(...urls) {
+                setTimeout(() => {
+                    urls.forEach(url => URL.revokeObjectURL(url));
+                }, 1000);
+            }
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new TicketDisplay();
+        });
+    </script>
 </body>
 </html>
