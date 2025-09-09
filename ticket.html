@@ -91,7 +91,9 @@
               document.getElementById('downloadMessage').classList.remove('d-none');
               createConfetti();
               setTimeout(()=>{URL.revokeObjectURL(pngUrl); URL.revokeObjectURL(url);},1000);
-              document.getElementById('addToCalendarBtn').classList.remove('d-none');
+              const addToCalendarBtn = document.getElementById('addToCalendarBtn');
+              addToCalendarBtn.classList.remove('d-none');
+              addToCalendarBtn.addEventListener('click', addToCalendar);
             };
           }, 'image/png');
         };
