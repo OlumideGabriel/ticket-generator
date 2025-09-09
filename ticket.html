@@ -270,6 +270,17 @@
                 this.elements.loadingState.classList.add('d-none');
                 this.elements.errorState.textContent = message;
                 this.elements.errorState.classList.remove('d-none');
+
+                // Scroll error into view on mobile
+                this.elements.errorState.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+
+                // Add haptic feedback
+                if ('vibrate' in navigator) {
+                    navigator.vibrate([100, 50, 100]);
+                }
             }
 
             cleanupUrls(...urls) {

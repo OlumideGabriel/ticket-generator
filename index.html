@@ -122,7 +122,7 @@
             setLoadingState(isLoading) {
                 if (isLoading) {
                     this.submitBtn.disabled = true;
-                    this.submitBtn.innerHTML = '<span class="loading-spinner me-2"></span>';
+                    this.submitBtn.innerHTML = '<span class="loading-spinner me-2"></span>Generating...';
                 } else {
                     this.submitBtn.disabled = false;
                     this.submitBtn.textContent = 'Generate Ticket';
@@ -132,6 +132,17 @@
             showError(message) {
                 this.errorMessage.textContent = message;
                 this.errorMessage.classList.remove('d-none');
+
+                // Smooth scroll to error on mobile
+                this.errorMessage.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+
+                // Add haptic feedback on mobile devices
+                if ('vibrate' in navigator) {
+                    navigator.vibrate([100]);
+                }
             }
 
             hideError() {
