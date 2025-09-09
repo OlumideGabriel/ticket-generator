@@ -133,12 +133,6 @@
                 this.errorMessage.textContent = message;
                 this.errorMessage.classList.remove('d-none');
 
-                // Smooth scroll to error on mobile
-                this.errorMessage.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest'
-                });
-
                 // Add haptic feedback on mobile devices
                 if ('vibrate' in navigator) {
                     navigator.vibrate([100]);
