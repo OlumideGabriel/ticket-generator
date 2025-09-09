@@ -9,7 +9,7 @@
 <body class="bg-light d-flex flex-column justify-content-center align-items-center min-vh-100">
   <div class="container text-center">
     <h1 class="mb-4">🎟️ Get Your Custom Ticket</h1>
-    <form action="ticket.html" method="get" class="mx-auto w-100" style="max-width: 400px;">
+    <form id="ticketForm" class="mx-auto w-100" style="max-width: 400px;">
       <div class="mb-3">
         <label for="name" class="form-label">Enter your name:</label>
         <input type="text" id="name" name="name" class="form-control" placeholder="Your Name" required>
@@ -17,5 +17,28 @@
       <button type="submit" class="btn btn-primary w-100">Generate Ticket</button>
     </form>
   </div>
+
+  <script>
+    const form = document.getElementById('ticketForm');
+    form.addEventListener('submit', function(e) {
+      e.preventDefault(); // Stop normal form submission
+
+      const name = document.getElementById('name').value.trim();
+      if (!name) return alert("Please enter your name.");
+
+      const webAppURL = "https://script.google.com/macros/s/AKfycbxXOhLSIH2dYzIcEL-MxO8ckFpMtb5UhPxrmjbhOxrkaH3oWoUZ_wPluOZfKsubnHHm/exec";
+
+      // Send name to Google Sheets
+      fetch(webAppURL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      }).finally(() => {
+        // Redirect to ticket page
+        window.location.href = `ticket.html?name=${encodeURIComponent(name)}`;
+      });
+    });
+  </script>
 </body>
 </html>

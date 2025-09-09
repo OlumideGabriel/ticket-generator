@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Your Ticket</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
   #ticketContainer svg {
     max-width: 100%;
@@ -12,21 +12,15 @@
     height: auto;
     border-radius: 5px;
   }
-
-  /* Confetti animation styles */
   .confetti {
     position: fixed;
     width: 10px;
     height: 10px;
-    background: #f0f;
-    animation: confetti-fall 3s linear forwards;
     z-index: 1000;
+    animation: confetti-fall 3s linear forwards;
   }
-
   @keyframes confetti-fall {
-    to {
-      transform: translateY(100vh) rotate(360deg);
-    }
+    to { transform: translateY(100vh) rotate(360deg); }
   }
 </style>
 </head>
@@ -45,152 +39,74 @@
       return urlParams.get(param);
     }
 
-    function createConfetti() {
-      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
-      const confettiCount = 50;
+    const userName = getQueryParam('name') || 'Guest';
 
-      for (let i = 0; i < confettiCount; i++) {
+    function createConfetti() {
+      const colors = ['#ff6b6b','#4ecdc4','#45b7d1','#96ceb4','#feca57','#ff9ff3','#54a0ff'];
+      for (let i = 0; i < 50; i++) {
         const confetti = document.createElement('div');
         confetti.classList.add('confetti');
-
-        // Random color
-        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
-
-        // Random starting position
-        confetti.style.left = Math.random() * 100 + 'vw';
-
-        // Random size
-        const size = Math.random() * 8 + 4;
-        confetti.style.width = size + 'px';
-        confetti.style.height = size + 'px';
-
-        // Random animation duration
-        confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
-
-        // Random delay
-        confetti.style.animationDelay = Math.random() * 0.5 + 's';
-
+        confetti.style.background = colors[Math.floor(Math.random()*colors.length)];
+        confetti.style.left = Math.random()*100+'vw';
+        const size = Math.random()*8 + 4;
+        confetti.style.width = confetti.style.height = size+'px';
+        confetti.style.animationDuration = (Math.random()*2 + 2)+'s';
+        confetti.style.animationDelay = Math.random()*0.5+'s';
         document.body.appendChild(confetti);
-
-        // Remove confetti after animation
-        setTimeout(() => {
-          confetti.remove();
-        }, 4000);
+        setTimeout(() => confetti.remove(), 4000);
       }
     }
 
-    const userName = getQueryParam('name') || 'Guest';
-
-    // ✅ Send name to Google Sheets
-    fetch("https://script.google.com/macros/s/AKfycbx0izIu8kacD9D-GgLsHNL_CPQ1RZytzwgLpgCvcGF-HE1jqlIRZGgpxaaHyV4HeH1Y/exec", {
-      method: "POST",
-      mode: "no-cors", // allows cross-origin without errors
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ name: userName })
-    });
-
     fetch('Igando_Event_Ticket.svg')
-      .then(response => response.text())
+      .then(res => res.text())
       .then(svgText => {
         const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+        const svgDoc = parser.parseFromString(svgText,"image/svg+xml");
         const svg = svgDoc.querySelector('svg');
-
-        const textElement = svg.querySelector('#username');
-        if (textElement) {
-          textElement.textContent = userName;
-        }
-
-        const container = document.getElementById('ticketContainer');
-        container.appendChild(svg);
+        const textEl = svg.querySelector('#username');
+        if(textEl) textEl.textContent = userName;
+        document.getElementById('ticketContainer').appendChild(svg);
 
         const serializer = new XMLSerializer();
         const updatedSVG = serializer.serializeToString(svg);
-
         const img = new Image();
-        const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
+        const svgBlob = new Blob([updatedSVG], {type:"image/svg+xml"});
         const url = URL.createObjectURL(svgBlob);
 
-        img.onload = function () {
+        img.onload = function() {
           const canvas = document.createElement('canvas');
           canvas.width = svg.width.baseVal.value || 300;
           canvas.height = svg.height.baseVal.value || 150;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-
+          canvas.getContext('2d').drawImage(img, 0,0);
           canvas.toBlob(blob => {
             const pngUrl = URL.createObjectURL(blob);
-
-            // Setup download button
             const downloadBtn = document.getElementById('downloadBtn');
             downloadBtn.classList.remove('d-none');
-
-            downloadBtn.addEventListener('click', () => {
+            downloadBtn.onclick = () => {
               const a = document.createElement('a');
               a.href = pngUrl;
-              const sanitizedUserName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-              a.download = `${sanitizedUserName}_ticket.png`;
-              document.body.appendChild(a);
+              a.download = `${userName.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_ticket.png`;
               a.click();
-              document.body.removeChild(a);
-
-              // Hide download button and show success message
               downloadBtn.classList.add('d-none');
               document.getElementById('downloadMessage').classList.remove('d-none');
-
-              // Show Add to Calendar button after download
-              setTimeout(() => {
-                const addToCalendarBtn = document.getElementById('addToCalendarBtn');
-                addToCalendarBtn.classList.remove('d-none');
-                addToCalendarBtn.addEventListener('click', addToCalendar);
-              }, 300);
-
-              // Trigger confetti animation
               createConfetti();
-
-              // Clean up
-              setTimeout(() => {
-                URL.revokeObjectURL(pngUrl);
-                URL.revokeObjectURL(url);
-              }, 1000);
-            });
+              setTimeout(()=>{URL.revokeObjectURL(pngUrl); URL.revokeObjectURL(url);},1000);
+              document.getElementById('addToCalendarBtn').classList.remove('d-none');
+            };
           }, 'image/png');
         };
-
         img.src = url;
-      })
-      .catch(err => {
-        console.error("Error loading SVG:", err);
-        const container = document.getElementById('ticketContainer');
-        container.innerHTML = '<div class="alert alert-danger">Failed to load ticket. Please try again.</div>';
+      }).catch(err=>{
+        console.error(err);
+        document.getElementById('ticketContainer').innerHTML='<div class="alert alert-danger">Failed to load ticket.</div>';
       });
 
-    // ✅ Google Calendar integration
     function addToCalendar() {
-      const eventTitle = "Igando Beauty Event";
-      const eventDescription = "Your event ticket 🎟️";
-      const eventLocation = "Moreta Hall, Isheri Rd, Ijegun, Ikeja 102213, Lagos, Nigeria";
-      const startDate = new Date("2025-09-13T10:00:00");
-      const endDate = new Date("2025-09-13T14:00:00");
-
-      function formatDate(date) {
-        return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-      }
-
-      const startStr = formatDate(startDate);
-      const endStr = formatDate(endDate);
-
-      const googleCalendarUrl =
-        `https://calendar.google.com/calendar/render?action=TEMPLATE` +
-        `&text=${encodeURIComponent(eventTitle)}` +
-        `&dates=${startStr}/${endStr}` +
-        `&details=${encodeURIComponent(eventDescription)}` +
-        `&location=${encodeURIComponent(eventLocation)}` +
-        `&sf=true&output=xml`;
-
-      window.open(googleCalendarUrl, "_blank");
+      const start = new Date("2025-09-13T10:00:00");
+      const end = new Date("2025-09-13T14:00:00");
+      const formatDate = d => d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
+      const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Igando Beauty Event")}&dates=${formatDate(start)}/${formatDate(end)}&details=${encodeURIComponent("Your event ticket 🎟️")}&location=${encodeURIComponent("Moreta Hall, Isheri Rd, Ijegun, Ikeja, Lagos")}`;
+      window.open(url, "_blank");
     }
   </script>
 </body>
