@@ -41,6 +41,17 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column justify-content-center align-items-center vh-100 max-dvh-100">
@@ -52,12 +63,18 @@
             <p class="text-muted mt-2">Generating your personalized ticket...</p>
         </div>
 
+        <div id="debugInfo" class="debug-info d-none">
+            <strong>Debug Information:</strong><br>
+            <div id="debugMessages"></div>
+        </div>
+
         <div id="ticketContainer" class="mb-4 d-none"></div>
         <div id="errorState" class="alert alert-danger d-none"></div>
 
         <p id="downloadMessage" class="text-muted d-none">Your ticket has been downloaded! 🎉</p>
         <button id="downloadBtn" class="btn btn-primary btn-lg d-none">Download Ticket</button>
         <button id="addToCalendarBtn" class="btn btn-success btn-lg d-none mt-3">Add to Calendar</button>
+        <button id="toggleDebug" class="btn btn-secondary btn-sm mt-3">Show Debug Info</button>
     </div>
 
     <script>
@@ -77,11 +94,35 @@
                     errorState: document.getElementById('errorState'),
                     downloadBtn: document.getElementById('downloadBtn'),
                     addToCalendarBtn: document.getElementById('addToCalendarBtn'),
-                    downloadMessage: document.getElementById('downloadMessage')
+                    downloadMessage: document.getElementById('downloadMessage'),
+                    debugInfo: document.getElementById('debugInfo'),
+                    debugMessages: document.getElementById('debugMessages'),
+                    toggleDebug: document.getElementById('toggleDebug')
                 };
 
                 this.userName = this.getQueryParam('name') || 'Guest';
+                this.debugMessages = [];
+
+                this.setupDebugToggle();
                 this.initialize();
+            }
+
+            setupDebugToggle() {
+                this.elements.toggleDebug.onclick = () => {
+                    if (this.elements.debugInfo.classList.contains('d-none')) {
+                        this.elements.debugInfo.classList.remove('d-none');
+                        this.elements.toggleDebug.textContent = 'Hide Debug Info';
+                    } else {
+                        this.elements.debugInfo.classList.add('d-none');
+                        this.elements.toggleDebug.textContent = 'Show Debug Info';
+                    }
+                };
+            }
+
+            addDebugMessage(message) {
+                this.debugMessages.push(`${new Date().toLocaleTimeString()}: ${message}`);
+                this.elements.debugMessages.innerHTML = this.debugMessages.join('<br>');
+                console.log('DEBUG:', message);
             }
 
             getQueryParam(param) {
@@ -91,74 +132,174 @@
 
             async initialize() {
                 try {
+                    this.addDebugMessage(`Starting initialization for user: ${this.userName}`);
+                    this.addDebugMessage(`Current URL: ${window.location.href}`);
+                    this.addDebugMessage(`SVG file path: ${this.eventConfig.svgFile}`);
+
                     await this.loadAndCustomizeTicket();
                     this.showTicket();
                 } catch (error) {
+                    this.addDebugMessage(`Error during initialization: ${error.message}`);
                     this.showError('Failed to load ticket. Please try again.');
                     console.error('Ticket loading error:', error);
                 }
             }
 
             async loadAndCustomizeTicket() {
-                const response = await fetch(this.eventConfig.svgFile);
-                if (!response.ok) {
-                    throw new Error(`Failed to load SVG: ${response.status}`);
+                try {
+                    this.addDebugMessage(`Attempting to fetch SVG from: ${this.eventConfig.svgFile}`);
+
+                    // Try different paths
+                    const possiblePaths = [
+                        this.eventConfig.svgFile,
+                        `./${this.eventConfig.svgFile}`,
+                        `/${this.eventConfig.svgFile}`,
+                        `./assets/${this.eventConfig.svgFile}`,
+                        `/assets/${this.eventConfig.svgFile}`
+                    ];
+
+                    let response = null;
+                    let workingPath = null;
+
+                    for (const path of possiblePaths) {
+                        try {
+                            this.addDebugMessage(`Trying path: ${path}`);
+                            response = await fetch(path);
+
+                            this.addDebugMessage(`Response status: ${response.status} (${response.statusText})`);
+                            this.addDebugMessage(`Response URL: ${response.url}`);
+                            this.addDebugMessage(`Content-Type: ${response.headers.get('content-type')}`);
+
+                            if (response.ok) {
+                                workingPath = path;
+                                this.addDebugMessage(`✓ Successfully found SVG at: ${path}`);
+                                break;
+                            }
+                        } catch (fetchError) {
+                            this.addDebugMessage(`✗ Failed to fetch from ${path}: ${fetchError.message}`);
+                        }
+                    }
+
+                    if (!response || !response.ok) {
+                        throw new Error(`SVG file not found. Tried paths: ${possiblePaths.join(', ')}`);
+                    }
+
+                    const svgText = await response.text();
+                    this.addDebugMessage(`SVG content length: ${svgText.length} characters`);
+                    this.addDebugMessage(`SVG content preview: ${svgText.substring(0, 100)}...`);
+
+                    const svg = this.customizeSVG(svgText);
+                    this.elements.ticketContainer.appendChild(svg);
+
+                    await this.setupDownload(svg);
+                    this.addDebugMessage('✓ Ticket loaded and customized successfully');
+
+                } catch (error) {
+                    this.addDebugMessage(`Error in loadAndCustomizeTicket: ${error.message}`);
+                    throw error;
                 }
-
-                const svgText = await response.text();
-                const svg = this.customizeSVG(svgText);
-                this.elements.ticketContainer.appendChild(svg);
-
-                await this.setupDownload(svg);
             }
 
             customizeSVG(svgText) {
-                const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
-                const svg = svgDoc.querySelector('svg');
+                try {
+                    this.addDebugMessage('Customizing SVG...');
 
-                const textElement = svg.querySelector('#username');
-                if (textElement) {
-                    textElement.textContent = this.userName;
+                    const parser = new DOMParser();
+                    const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+
+                    // Check for parse errors
+                    const parseError = svgDoc.querySelector('parsererror');
+                    if (parseError) {
+                        throw new Error(`SVG parsing error: ${parseError.textContent}`);
+                    }
+
+                    const svg = svgDoc.querySelector('svg');
+                    if (!svg) {
+                        throw new Error('No SVG element found in the document');
+                    }
+
+                    this.addDebugMessage(`SVG dimensions: ${svg.getAttribute('width')} x ${svg.getAttribute('height')}`);
+
+                    const textElement = svg.querySelector('#username');
+                    if (textElement) {
+                        textElement.textContent = this.userName;
+                        this.addDebugMessage(`✓ Updated username to: ${this.userName}`);
+                    } else {
+                        this.addDebugMessage('⚠ No #username element found in SVG');
+
+                        // List all elements with IDs for debugging
+                        const elementsWithIds = svg.querySelectorAll('[id]');
+                        this.addDebugMessage(`Available IDs: ${Array.from(elementsWithIds).map(el => el.id).join(', ')}`);
+                    }
+
+                    return svg;
+                } catch (error) {
+                    this.addDebugMessage(`Error in customizeSVG: ${error.message}`);
+                    throw error;
                 }
-
-                return svg;
             }
 
             async setupDownload(svg) {
                 return new Promise((resolve, reject) => {
-                    const serializer = new XMLSerializer();
-                    const updatedSVG = serializer.serializeToString(svg);
-                    const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
-                    const url = URL.createObjectURL(svgBlob);
+                    try {
+                        this.addDebugMessage('Setting up download...');
 
-                    const img = new Image();
-                    img.onload = () => {
-                        try {
-                            const canvas = this.createCanvas(svg, img);
-                            canvas.toBlob(blob => {
-                                const pngUrl = URL.createObjectURL(blob);
-                                this.setupDownloadButton(pngUrl);
-                                this.cleanupUrls(url, pngUrl);
-                                resolve();
-                            }, 'image/png');
-                        } catch (error) {
-                            reject(error);
-                        }
-                    };
+                        const serializer = new XMLSerializer();
+                        const updatedSVG = serializer.serializeToString(svg);
+                        const svgBlob = new Blob([updatedSVG], { type: "image/svg+xml" });
+                        const url = URL.createObjectURL(svgBlob);
 
-                    img.onerror = () => reject(new Error('Failed to load image'));
-                    img.src = url;
+                        this.addDebugMessage(`SVG blob created, size: ${svgBlob.size} bytes`);
+
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                this.addDebugMessage(`Image loaded: ${img.width} x ${img.height}`);
+
+                                const canvas = this.createCanvas(svg, img);
+                                canvas.toBlob(blob => {
+                                    if (!blob) {
+                                        reject(new Error('Failed to create PNG blob'));
+                                        return;
+                                    }
+
+                                    this.addDebugMessage(`PNG blob created, size: ${blob.size} bytes`);
+                                    const pngUrl = URL.createObjectURL(blob);
+                                    this.setupDownloadButton(pngUrl);
+                                    this.cleanupUrls(url);
+                                    resolve();
+                                }, 'image/png');
+                            } catch (canvasError) {
+                                this.addDebugMessage(`Canvas error: ${canvasError.message}`);
+                                reject(canvasError);
+                            }
+                        };
+
+                        img.onerror = (imgError) => {
+                            this.addDebugMessage(`Image loading error: ${imgError}`);
+                            reject(new Error('Failed to load SVG as image'));
+                        };
+
+                        img.src = url;
+                    } catch (setupError) {
+                        this.addDebugMessage(`Setup error: ${setupError.message}`);
+                        reject(setupError);
+                    }
                 });
             }
 
             createCanvas(svg, img) {
                 const canvas = document.createElement('canvas');
-                canvas.width = svg.width?.baseVal?.value || 300;
-                canvas.height = svg.height?.baseVal?.value || 150;
+                const width = svg.width?.baseVal?.value || img.width || 350;
+                const height = svg.height?.baseVal?.value || img.height || 200;
+
+                canvas.width = width;
+                canvas.height = height;
+
+                this.addDebugMessage(`Canvas created: ${width} x ${height}`);
 
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
+                ctx.drawImage(img, 0, 0, width, height);
 
                 return canvas;
             }
@@ -166,16 +307,22 @@
             setupDownloadButton(pngUrl) {
                 this.elements.downloadBtn.classList.remove('d-none');
                 this.elements.downloadBtn.onclick = () => this.downloadTicket(pngUrl);
+                this.addDebugMessage('✓ Download button ready');
             }
 
             downloadTicket(pngUrl) {
-                const link = document.createElement('a');
-                link.href = pngUrl;
-                link.download = this.generateFileName();
-                link.click();
+                try {
+                    const link = document.createElement('a');
+                    link.href = pngUrl;
+                    link.download = this.generateFileName();
+                    link.click();
 
-                this.showDownloadSuccess();
-                this.showCalendarButton();
+                    this.addDebugMessage(`✓ Download initiated: ${link.download}`);
+                    this.showDownloadSuccess();
+                    this.showCalendarButton();
+                } catch (downloadError) {
+                    this.addDebugMessage(`Download error: ${downloadError.message}`);
+                }
             }
 
             generateFileName() {
@@ -247,6 +394,7 @@
                 });
 
                 window.open(calendarUrl, "_blank");
+                this.addDebugMessage('✓ Calendar event opened');
             }
 
             buildCalendarUrl({ title, start, end, description, location }) {
@@ -265,12 +413,17 @@
             showTicket() {
                 this.elements.loadingState.style.display = 'none';
                 this.elements.ticketContainer.classList.remove('d-none');
+                this.addDebugMessage('✓ Ticket displayed');
             }
 
             showError(message) {
                 this.elements.loadingState.classList.add('d-none');
                 this.elements.errorState.textContent = message;
                 this.elements.errorState.classList.remove('d-none');
+
+                // Show debug info when there's an error
+                this.elements.debugInfo.classList.remove('d-none');
+                this.elements.toggleDebug.textContent = 'Hide Debug Info';
 
                 // Scroll error into view on mobile
                 this.elements.errorState.scrollIntoView({
@@ -286,7 +439,14 @@
 
             cleanupUrls(...urls) {
                 setTimeout(() => {
-                    urls.forEach(url => URL.revokeObjectURL(url));
+                    urls.forEach(url => {
+                        try {
+                            URL.revokeObjectURL(url);
+                            this.addDebugMessage(`✓ Cleaned up URL: ${url.substring(0, 50)}...`);
+                        } catch (e) {
+                            this.addDebugMessage(`⚠ Failed to cleanup URL: ${e.message}`);
+                        }
+                    });
                 }, 1000);
             }
         }
